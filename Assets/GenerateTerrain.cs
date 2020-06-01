@@ -4,8 +4,13 @@ using System.Numerics;
 using UnityEngine;
 using Vector3 = UnityEngine.Vector3;
 
+
+
 public class GenerateTerrain : MonoBehaviour
 {
+
+    public int itterations = 1000;
+    public float flowScale = 10f;
     public int x_scale = 20;
     public int z_scale = 20;
 
@@ -27,26 +32,24 @@ public class GenerateTerrain : MonoBehaviour
     private int[] tris;
     private int[][][] neighbors;
     private Color[] colors;
+    private int[][] nInd;
+
+    private class Droplet
+    {
+        public int index;
+        public float sediment;
+        public float mass;
+    }
 
     // Start is called before the first frame update
     void Start()
     {
         planeMesh = new Mesh();
         GetComponent<MeshFilter>().mesh = planeMesh;
-        neighbors = GenerateNeighborNetwork();
-
+    
         CreateShape();
-        flow = GetFlowGraph();
-        colors = new Color[flow.Length];
-        for (int i = 0; i < flow.Length; i++) {
-            colors[i] = Color.Lerp(Color.gray, Color.red, flow[i].y);
-            Debug.Log(flow[i].y);
-            Debug.Log(colors[i]);
-        }
-
-
         UpdateMesh();
-
+        neighbors = GenerateNeighborNetwork();
     }
 
 
@@ -108,14 +111,82 @@ public class GenerateTerrain : MonoBehaviour
 
 
     void SimulateRainFall() {
+        flow = GetFlowGraph();
 
+        colors = new Color[heightmap.Length];
+        for (int c = 0; c < heightmap.Length; c++) {
+            colors[c] = Color.Lerp(Color.green, Color.red, flow[c].y);
+        }
+
+
+
+        for (int i = 0; i < itterations; i++) {
+            Droplet droplet = new Droplet();
+            droplet.index = (int)Random.Range(0f, flow.Length);
+            droplet.mass = Random.Range(0.1f, flowScale);
+            droplet.sediment = 0f;
+
+            while (droplet.mass > 0) {
+                //Debug.Log("Current index: " + droplet.index);
+                //Debug.Log("Current Sediment: " + droplet.sediment);
+               // Debug.Log("Current mass: " + droplet.mass);
+                Vector3 current = flow[droplet.index];
+
+                
+
+                float evaporation = getEvaporation(droplet.mass, current.y);
+                if (evaporation > droplet.mass) {
+                    droplet.mass = 0;
+                } else {
+                    droplet.mass -= evaporation;
+                }
+
+
+                
+
+                if (droplet.sediment > droplet.mass) {
+                    float sum = 0;
+                    float delta = (droplet.sediment - droplet.mass);
+                    int[] neighborIndexes = GetNeighbors(droplet.index);
+                    for (int n = 0; n < 8; n++) {
+                        int neighbor = neighborIndexes[n];
+                        float amount = (delta / 16f) * Random.Range(0.75f, 1.25f);
+                        heightmap[neighbor].y += amount;
+                        droplet.sediment -= amount;
+                        sum += amount;
+                    }
+                    float deposit = delta * Random.Range(0.75f, 1.25f) / 2f;
+                    heightmap[droplet.index].y += deposit;
+                    droplet.sediment -= deposit;
+                } else {
+                    float delta = (droplet.mass - droplet.sediment);
+                    float erosion = Erode(delta, current.y);
+                    heightmap[droplet.index].y -= erosion;
+                    droplet.sediment += erosion;
+                }
+
+                droplet.index = (int)current.x;
+
+            }
+            
+        }
 
 
         UpdateMesh();
     }
 
+    float Erode(float delta, float max) {
+        float random = Random.Range(0f, 1.0f);
+        float capacity = delta * random;
+        return capacity < max ? capacity : max * random;
+    }
+
+    float getEvaporation(float mass, float slope) {
+        return mass / (slope * slope);
+    }
+
     Vector3[] GetFlowGraph() {
-        Vector3[] flowDirection = new Vector3[(x_scale + 1) * (z_scale + 1)];
+        Vector3[] flowDirection = new Vector3[heightmap.Length];
         int heightCount = 0;
         for (int z = 0; z <= z_scale; z++) {
             for (int x = 0; x <= x_scale; x++) {
@@ -124,17 +195,13 @@ public class GenerateTerrain : MonoBehaviour
                 int bestIndex = heightCount;
                 for (int i = 0; i < 8; i++) {
                     Vector3 current = heightmap[index[i]];
-                    if (best.y > current.y) {
+                    if (current.y < best.y) {
                         best = current;
                         bestIndex = index[i];
                     }
                 }
 
                 float delta = heightmap[heightCount].y - best.y;
-
-                // We need next index
-                // Max erosion value
-
 
                 flowDirection[heightCount] = new Vector3(bestIndex, delta, 0);
 
@@ -149,8 +216,14 @@ public class GenerateTerrain : MonoBehaviour
         return neighbors[x][z];
     }
 
+    int[] GetNeighbors(int index) {
+        return neighbors[nInd[index][0]][nInd[index][1]];
+    }
+
     int[][][] GenerateNeighborNetwork() {
+        nInd = new int[heightmap.Length][];
         neighbors = new int[x_scale + 1][][];
+        int index = 0;
         for (int x = 0; x <= x_scale; x++) {
             neighbors[x] = new int[z_scale + 1][];
             for (int z = 0; z <= z_scale; z++) {
@@ -163,6 +236,11 @@ public class GenerateTerrain : MonoBehaviour
                 neighbors[x][z][5] = mod((x + 1), x_scale) + (z) * x_scale;
                 neighbors[x][z][6] = mod((x + 1), x_scale) + mod((z - 1), z_scale) * x_scale;
                 neighbors[x][z][7] = (x) + mod((z - 1), z_scale) * x_scale;
+
+                nInd[index] = new int[2];
+                nInd[index][0] = x;
+                nInd[index][1] = z;
+                index++;
                 //Debug.Log(string.Join("", new List<int>(neighbors[x][z]).ConvertAll(i => i.ToString() + " ").ToArray()));
             }
            
@@ -178,6 +256,8 @@ public class GenerateTerrain : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        SimulateRainFall();
         
+
     }
 }

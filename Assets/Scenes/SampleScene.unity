@@ -327,6 +327,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 89e823ed8516cd3468c38dfdabb46335, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  itterations: 1000
+  flowScale: 2
   x_scale: 100
   z_scale: 100
   amplitude_a: 0.1
@@ -357,7 +359,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 337af152518b7374d806ce9b97e37f1f, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
