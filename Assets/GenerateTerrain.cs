@@ -26,6 +26,7 @@ public class GenerateTerrain : MonoBehaviour
     private Mesh planeMesh;
     private int[] tris;
     private int[][][] neighbors;
+    private Color[] colors;
 
     // Start is called before the first frame update
     void Start()
@@ -35,7 +36,15 @@ public class GenerateTerrain : MonoBehaviour
         neighbors = GenerateNeighborNetwork();
 
         CreateShape();
-        //flow = GetFlowGraph();
+        flow = GetFlowGraph();
+        colors = new Color[flow.Length];
+        for (int i = 0; i < flow.Length; i++) {
+            colors[i] = Color.Lerp(Color.gray, Color.red, flow[i].y);
+            Debug.Log(flow[i].y);
+            Debug.Log(colors[i]);
+        }
+
+
         UpdateMesh();
 
     }
@@ -57,6 +66,7 @@ public class GenerateTerrain : MonoBehaviour
     void UpdateMesh() {
         planeMesh.vertices = heightmap;
         planeMesh.triangles = tris;
+        planeMesh.colors = colors;
         planeMesh.RecalculateNormals();
         planeMesh.RecalculateTangents();
         planeMesh.RecalculateBounds();
@@ -111,14 +121,22 @@ public class GenerateTerrain : MonoBehaviour
             for (int x = 0; x <= x_scale; x++) {
                 int[] index = GetNeighbors(x, z);
                 Vector3 best = heightmap[heightCount];
+                int bestIndex = heightCount;
                 for (int i = 0; i < 8; i++) {
                     Vector3 current = heightmap[index[i]];
                     if (best.y > current.y) {
                         best = current;
+                        bestIndex = index[i];
                     }
                 }
 
-                flowDirection[heightCount] = best;
+                float delta = heightmap[heightCount].y - best.y;
+
+                // We need next index
+                // Max erosion value
+
+
+                flowDirection[heightCount] = new Vector3(bestIndex, delta, 0);
 
                 heightCount++;
             }
@@ -132,10 +150,10 @@ public class GenerateTerrain : MonoBehaviour
     }
 
     int[][][] GenerateNeighborNetwork() {
-        neighbors = new int[x_scale][][];
-        for (int x = 0; x < x_scale; x++) {
-            neighbors[x] = new int[z_scale][];
-            for (int z = 0; z < z_scale; z++) {
+        neighbors = new int[x_scale + 1][][];
+        for (int x = 0; x <= x_scale; x++) {
+            neighbors[x] = new int[z_scale + 1][];
+            for (int z = 0; z <= z_scale; z++) {
                 neighbors[x][z] = new int[8];
                 neighbors[x][z][0] = mod((x - 1), x_scale) + mod((z - 1), z_scale) * x_scale;
                 neighbors[x][z][1] = mod((x - 1), x_scale) + (z) * x_scale;
@@ -145,7 +163,7 @@ public class GenerateTerrain : MonoBehaviour
                 neighbors[x][z][5] = mod((x + 1), x_scale) + (z) * x_scale;
                 neighbors[x][z][6] = mod((x + 1), x_scale) + mod((z - 1), z_scale) * x_scale;
                 neighbors[x][z][7] = (x) + mod((z - 1), z_scale) * x_scale;
-                Debug.Log(string.Join("", new List<int>(neighbors[x][z]).ConvertAll(i => i.ToString() + " ").ToArray()));
+                //Debug.Log(string.Join("", new List<int>(neighbors[x][z]).ConvertAll(i => i.ToString() + " ").ToArray()));
             }
            
         }
